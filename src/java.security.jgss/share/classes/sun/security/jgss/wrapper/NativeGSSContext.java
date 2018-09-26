@@ -327,12 +327,6 @@ class NativeGSSContext implements GSSContextSpi {
                          cStub);
                 }
                 // XXX Attempt to get the actual target name from the cStub.
-
-                if (cred == null) {
-                    disposeCred = cred =
-                        new GSSCredElement(srcName, lifetime,
-                                GSSCredential.INITIATE_ONLY, cStub);
-                }
             }
         }
         return outToken;
@@ -353,13 +347,6 @@ class NativeGSSContext implements GSSContextSpi {
             if (isEstablished && targetName == null) {
                 targetName = new GSSNameElement
                     (cStub.getContextName(pContext, false), actualMech, cStub);
-                // Replace the current default acceptor cred now that
-                // the context acceptor name is available
-                if (disposeCred != null)
-                    disposeCred.dispose();
-                disposeCred = cred =
-                    new GSSCredElement(targetName, lifetime,
-                            GSSCredential.ACCEPT_ONLY, cStub);
             }
 
             // Only inspect token when the permission check has not
