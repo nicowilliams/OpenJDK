@@ -65,7 +65,7 @@ on:
 jobs:
   build-linux:
     name: build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container:
       #image: debian:bullseye
       image: ubuntu:18.04
