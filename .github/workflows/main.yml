@@ -330,7 +330,7 @@ jobs:
     with:
       platform: windows-x64
       bootjdk-platform: windows-x64
-      runs-on: windows-2019
+      runs-on: windows-2022
 
   # Remove bundles so they are not misconstrued as binary distributions from the JDK project
   #remove-bundles:
