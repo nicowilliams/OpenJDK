@@ -66,6 +66,9 @@ jobs:
   build-linux:
     name: build
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_RUNNER_DEBUG: true
+      ACTIONS_STEP_DEBUG: true
     #container:
       #image: debian:bullseye
       #image: ubuntu:18.04
