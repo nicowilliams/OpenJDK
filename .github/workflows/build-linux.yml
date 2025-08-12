@@ -85,7 +85,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev debootstrap debian-archive-keyring
           # If we really need gcc-10, we can get it from this PPA:
-          sudo apt-get install -y software-properties-common
+          sudo apt-get install -y software-properties-common schroot fakeroot fakechroot
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 
       - name: 'Cache sysroot'
@@ -98,13 +98,13 @@ jobs:
         run: |
           set -vx
           if [ ! -d sysroot-focal ]; then
-            sudo debootstrap --arch=$(dpkg --print-architecture) focal sysroot-focal http://archive.ubuntu.com/ubuntu
+            fakechroot fakeroot debootstrap --arch=$(dpkg --print-architecture) focal sysroot-focal http://archive.ubuntu.com/ubuntu
           fi
-          sudo chroot sysroot-focal apt-get update
-          sudo chroot sysroot-focal apt-get install -y build-essential git wget curl sudo unzip zip autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
+          fakechroot fakeroot chroot sysroot-focal apt-get update
+          fakechroot fakeroot chroot sysroot-focal apt-get install -y build-essential git wget curl sudo unzip zip autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
           # If we really need gcc-10, we can get it from this PPA:
-          sudo chroot sysroot-focal apt-get install -y software-properties-common
-          sudo chroot sysroot-focal sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          fakechroot fakeroot chroot sysroot-focal apt-get install -y software-properties-common
+          fakechroot fakeroot chroot sysroot-focal sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 
       - name: 'Checkout the JDK source'
         uses: actions/checkout@v3.6.0
