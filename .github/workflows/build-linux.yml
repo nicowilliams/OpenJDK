@@ -66,9 +66,9 @@ jobs:
   build-linux:
     name: build
     runs-on: ubuntu-latest
-    container:
+    #container:
       #image: debian:bullseye
-      image: ubuntu:18.04
+      #image: ubuntu:18.04
 
     strategy:
       fail-fast: false
@@ -87,6 +87,23 @@ jobs:
           # If we really need gcc-10, we can get it from this PPA:
           apt-get install -y software-properties-common
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+
+      - name: 'Cache sysroot'
+        uses: actions/cache@v3
+        with:
+          path: sysroot-bullseye
+          key: sysroot-bullseye-${{ runner.as }}
+
+      - name: 'Setup cross-compilation sysroot'
+        run: |
+          if [ ! -d sysroot-bullseye ]; then
+            sudo debootstrap --arch=$(dpkg --print-architecture) bullseye sysroot-bullseye http://archive.ubuntu.com/ubuntu
+          fi
+          sudo chroot sysroot-bullseye apt-get update
+          sudo chroot sysroot-bullseye apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
+          # If we really need gcc-10, we can get it from this PPA:
+          sudo chroot sysroot-bullseye apt-get install -y software-properties-common
+          sudo chroot sysroot-bullseye sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 
       - name: 'Checkout the JDK source'
         uses: actions/checkout@v3.6.0
@@ -139,6 +156,10 @@ jobs:
           --with-gtest=${{ steps.gtest.outputs.path }}
           --with-zlib=system
           --with-jmod-compress=zip-1
+          --with-sysroot=$PWD/sysroot-bullseye
+          --with-extra-cflags="--sysroot=$PWD/sysroot-bullseye"
+          --with-extra-cxxflags="--sysroot=$PWD/sysroot-bullseye"
+          --with-extra-ldflags="--sysroot=$PWD/sysroot-bullseye"
           ${{ inputs.extra-conf-options }} ${{ inputs.configure-arguments }} || (
           echo "Dumping config.log:" &&
           cat config.log &&
