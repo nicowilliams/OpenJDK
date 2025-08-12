@@ -82,10 +82,10 @@ jobs:
     steps:
       - name: 'Install some dependencies'
         run: |
-          apt-get update
-          apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
+          sudo apt-get update
+          sudo apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
           # If we really need gcc-10, we can get it from this PPA:
-          apt-get install -y software-properties-common
+          sudo apt-get install -y software-properties-common
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 
       - name: 'Cache sysroot'
