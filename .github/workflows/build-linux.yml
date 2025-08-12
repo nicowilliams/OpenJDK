@@ -83,7 +83,7 @@ jobs:
       - name: 'Install some dependencies'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
+          sudo apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev debootstrap debian-archive-keyring
           # If we really need gcc-10, we can get it from this PPA:
           sudo apt-get install -y software-properties-common
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test
@@ -96,11 +96,12 @@ jobs:
 
       - name: 'Setup cross-compilation sysroot'
         run: |
+          set -vx
           if [ ! -d sysroot-bullseye ]; then
             sudo debootstrap --arch=$(dpkg --print-architecture) bullseye sysroot-bullseye http://archive.ubuntu.com/ubuntu
           fi
           sudo chroot sysroot-bullseye apt-get update
-          sudo chroot sysroot-bullseye apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
+          sudo chroot sysroot-bullseye apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev debian-archive-keyring
           # If we really need gcc-10, we can get it from this PPA:
           sudo chroot sysroot-bullseye apt-get install -y software-properties-common
           sudo chroot sysroot-bullseye sudo add-apt-repository ppa:ubuntu-toolchain-r/test
