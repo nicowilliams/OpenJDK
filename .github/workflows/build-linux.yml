@@ -98,13 +98,14 @@ jobs:
         run: |
           set -vx
           if [ ! -d sysroot-focal ]; then
-            fakechroot fakeroot debootstrap --arch=$(dpkg --print-architecture) focal sysroot-focal http://archive.ubuntu.com/ubuntu
+            sudo debootstrap --arch=$(dpkg --print-architecture) --foreign focal sysroot-focal http://archive.ubuntu.com/ubuntu
           fi
-          fakechroot fakeroot chroot sysroot-focal apt-get update
-          fakechroot fakeroot chroot sysroot-focal apt-get install -y build-essential git wget curl sudo unzip zip autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
+          sudo chroot sysroot-focal ${PWD}/sysroot-focal/$(which apt-get) update
+          sudo chroot sysroot-focal ${PWD}/sysroot-focal/$(which apt-get) install -y build-essential git wget curl sudo unzip zip autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
           # If we really need gcc-10, we can get it from this PPA:
-          fakechroot fakeroot chroot sysroot-focal apt-get install -y software-properties-common
-          fakechroot fakeroot chroot sysroot-focal sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          sudo chroot sysroot-focal ${PWD}/sysroot-focal/$(which apt-get) install -y software-properties-common
+          sudo chroot sysroot-focal ${PWD}/sysroot-focal/$(which sudo) add-apt-repository ppa:ubuntu-toolchain-r/test
+          sudo chown -R $USER:$USER sysroot-focal
 
       - name: 'Checkout the JDK source'
         uses: actions/checkout@v3.6.0
