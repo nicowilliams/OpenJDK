@@ -105,6 +105,7 @@ jobs:
           # If we really need gcc-10, we can get it from this PPA:
           sudo chroot sysroot-focal ${PWD}/sysroot-focal/$(which apt-get) install -y software-properties-common
           sudo chroot sysroot-focal ${PWD}/sysroot-focal/$(which sudo) add-apt-repository ppa:ubuntu-toolchain-r/test
+          # So the OpenJDK configuration and build can use the sysroot
           sudo chown -R $USER:$USER sysroot-focal
 
       - name: 'Checkout the JDK source'
