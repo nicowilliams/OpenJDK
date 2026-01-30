@@ -136,6 +136,46 @@ public final class ServiceCreds {
         return sc;
     }
 
+    /**
+     * Creates a ServiceCreds object based on a KeyTab for a given principal.
+     * This is used when credentials are acquired directly from a keytab file
+     * rather than from a Subject.
+     *
+     * @param ktab the keytab to use
+     * @param serverPrincipal the server principal name, may be null for unbound
+     * @return the object, or null if keytab has no keys for the principal
+     */
+    public static ServiceCreds getInstance(KeyTab ktab, String serverPrincipal) {
+        ServiceCreds sc = new ServiceCreds();
+
+        sc.allPrincs = new java.util.HashSet<>();
+        sc.kk = new ArrayList<>();
+        sc.tgt = null;
+        sc.ktabs = new ArrayList<>();
+        sc.ktabs.add(ktab);
+
+        if (serverPrincipal != null) {
+            sc.kp = new KerberosPrincipal(serverPrincipal);
+            sc.allPrincs.add(sc.kp);
+
+            // Verify that the keytab has keys for this principal
+            KerberosKey[] keys = ktab.getKeys(sc.kp);
+            if (keys == null || keys.length == 0) {
+                return null;
+            }
+        } else {
+            // Unbound - try to get a principal from the keytab
+            sc.kp = null;
+            PrincipalName pn = Krb5Util.snapshotFromJavaxKeyTab(ktab).getOneName();
+            if (pn != null) {
+                sc.allPrincs.add(new KerberosPrincipal(pn.getName()));
+            }
+        }
+
+        sc.destroyed = false;
+        return sc;
+    }
+
     // can be null
     public String getName() {
         if (destroyed) {

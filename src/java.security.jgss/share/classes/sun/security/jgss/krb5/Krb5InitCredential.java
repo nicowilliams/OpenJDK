@@ -31,6 +31,7 @@ import sun.security.jgss.spi.*;
 import sun.security.krb5.*;
 import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.kerberos.KerberosPrincipal;
+import javax.security.auth.kerberos.KeyTab;
 import java.io.Serial;
 import java.net.InetAddress;
 import java.io.InvalidObjectException;
@@ -258,6 +259,161 @@ public class Krb5InitCredential
                                       delegatedCred.getEndTime(),
                                       delegatedCred.getRenewTill(),
                                       delegatedCred.getClientAddresses());
+    }
+
+    /**
+     * Acquire initiator credentials from a credential cache file.
+     *
+     * @param caller the caller context
+     * @param name the principal name, may be null to use default from cache
+     * @param ccachePath the path to the credential cache file
+     * @return the initiator credential
+     * @throws GSSException if credentials cannot be acquired
+     */
+    static Krb5InitCredential getInstance(GSSCaller caller,
+                                          Krb5NameElement name,
+                                          String ccachePath)
+        throws GSSException {
+
+        try {
+            PrincipalName princ = (name != null) ?
+                name.getKrb5PrincipalName() : null;
+
+            Credentials creds = Credentials.acquireTGTFromCache(princ, ccachePath);
+
+            if (creds == null) {
+                throw new GSSException(GSSException.NO_CRED, -1,
+                    "No TGT found in credential cache" +
+                    (ccachePath != null ? ": " + ccachePath : ""));
+            }
+
+            return createFromCredentials(name, creds);
+        } catch (KrbException | IOException e) {
+            GSSException ge = new GSSException(GSSException.NO_CRED, -1,
+                "Failed to acquire credentials from cache: " + e.getMessage());
+            ge.initCause(e);
+            throw ge;
+        }
+    }
+
+    /**
+     * Acquire initiator credentials using a password.
+     *
+     * @param caller the caller context
+     * @param name the principal name, must not be null
+     * @param password the password to use for AS exchange
+     * @return the initiator credential
+     * @throws GSSException if credentials cannot be acquired
+     */
+    static Krb5InitCredential getInstance(GSSCaller caller,
+                                          Krb5NameElement name,
+                                          char[] password)
+        throws GSSException {
+
+        if (name == null) {
+            throw new GSSException(GSSException.NO_CRED, -1,
+                "Principal name required when using password");
+        }
+
+        try {
+            PrincipalName principal = name.getKrb5PrincipalName();
+            KrbAsReqBuilder builder = new KrbAsReqBuilder(principal, password);
+            Credentials creds = builder.action().getCreds();
+            builder.destroy();
+
+            return createFromCredentials(name, creds);
+        } catch (KrbException | IOException e) {
+            GSSException ge = new GSSException(GSSException.NO_CRED, -1,
+                "Failed to acquire credentials with password: " + e.getMessage());
+            ge.initCause(e);
+            throw ge;
+        }
+    }
+
+    /**
+     * Acquire initiator credentials using a keytab.
+     *
+     * @param caller the caller context
+     * @param name the principal name, must not be null
+     * @param ktab the keytab containing the principal's key
+     * @return the initiator credential
+     * @throws GSSException if credentials cannot be acquired
+     */
+    static Krb5InitCredential getInstance(GSSCaller caller,
+                                          Krb5NameElement name,
+                                          KeyTab ktab)
+        throws GSSException {
+
+        if (name == null) {
+            throw new GSSException(GSSException.NO_CRED, -1,
+                "Principal name required when using keytab");
+        }
+
+        try {
+            PrincipalName principal = name.getKrb5PrincipalName();
+
+            // Verify key exists in keytab
+            EncryptionKey[] keys = Krb5Util.keysFromJavaxKeyTab(ktab, principal);
+            if (keys == null || keys.length == 0) {
+                throw new GSSException(GSSException.NO_CRED, -1,
+                    "No key found for principal " + principal + " in keytab");
+            }
+            for (EncryptionKey key : keys) {
+                key.destroy();
+            }
+
+            KrbAsReqBuilder builder = new KrbAsReqBuilder(principal, ktab);
+            Credentials creds = builder.action().getCreds();
+            builder.destroy();
+
+            return createFromCredentials(name, creds);
+        } catch (KrbException | IOException e) {
+            GSSException ge = new GSSException(GSSException.NO_CRED, -1,
+                "Failed to acquire credentials from keytab: " + e.getMessage());
+            ge.initCause(e);
+            throw ge;
+        }
+    }
+
+    /**
+     * Create a Krb5InitCredential from sun.security.krb5.Credentials.
+     */
+    private static Krb5InitCredential createFromCredentials(Krb5NameElement name,
+                                                            Credentials creds)
+        throws GSSException {
+
+        KerberosTicket tgt = Krb5Util.credsToTicket(creds);
+
+        if (name == null) {
+            String fullName = tgt.getClient().getName();
+            name = Krb5NameElement.getInstance(fullName,
+                                       Krb5MechFactory.NT_GSS_KRB5_PRINCIPAL);
+        }
+
+        KerberosPrincipal clientAlias = KerberosSecrets
+                .getJavaxSecurityAuthKerberosAccess()
+                .kerberosTicketGetClientAlias(tgt);
+        KerberosPrincipal serverAlias = KerberosSecrets
+                .getJavaxSecurityAuthKerberosAccess()
+                .kerberosTicketGetServerAlias(tgt);
+
+        Krb5InitCredential result = new Krb5InitCredential(name,
+                                      tgt.getEncoded(),
+                                      tgt.getClient(),
+                                      clientAlias,
+                                      tgt.getServer(),
+                                      serverAlias,
+                                      tgt.getSessionKey().getEncoded(),
+                                      tgt.getSessionKeyType(),
+                                      tgt.getFlags(),
+                                      tgt.getAuthTime(),
+                                      tgt.getStartTime(),
+                                      tgt.getEndTime(),
+                                      tgt.getRenewTill(),
+                                      tgt.getClientAddresses());
+        result.proxyTicket = KerberosSecrets.getJavaxSecurityAuthKerberosAccess().
+            kerberosTicketGetProxy(tgt);
+        return result;
     }
 
     /**

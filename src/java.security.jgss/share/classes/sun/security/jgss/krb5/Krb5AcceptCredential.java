@@ -30,6 +30,7 @@ import sun.security.jgss.GSSCaller;
 import sun.security.jgss.spi.*;
 import sun.security.krb5.*;
 import javax.security.auth.DestroyFailedException;
+import javax.security.auth.kerberos.KeyTab;
 import javax.security.auth.login.LoginException;
 
 /**
@@ -80,6 +81,42 @@ public class Krb5AcceptCredential
         if (creds == null)
             throw new GSSException(GSSException.NO_CRED, -1,
                                    "Failed to find any Kerberos credentials");
+
+        if (name == null) {
+            String fullName = creds.getName();
+            if (fullName != null) {
+                name = Krb5NameElement.getInstance(fullName,
+                                       Krb5MechFactory.NT_GSS_KRB5_PRINCIPAL);
+            }
+        }
+
+        return new Krb5AcceptCredential(name, creds);
+    }
+
+    /**
+     * Acquire acceptor credentials directly from a keytab file.
+     *
+     * @param caller the caller context
+     * @param name the principal name, may be null for unbound acceptor
+     * @param ktab the keytab containing the service key(s)
+     * @return the acceptor credential
+     * @throws GSSException if credentials cannot be acquired
+     */
+    static Krb5AcceptCredential getInstance(final GSSCaller caller,
+                                            Krb5NameElement name,
+                                            KeyTab ktab)
+        throws GSSException {
+
+        final String serverPrinc = (name == null ? null :
+            name.getKrb5PrincipalName().getName());
+
+        ServiceCreds creds = ServiceCreds.getInstance(ktab, serverPrinc);
+
+        if (creds == null) {
+            throw new GSSException(GSSException.NO_CRED, -1,
+                "Failed to find Kerberos credentials in keytab" +
+                (serverPrinc != null ? " for " + serverPrinc : ""));
+        }
 
         if (name == null) {
             String fullName = creds.getName();

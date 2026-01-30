@@ -333,30 +333,20 @@ public class GssLoginModule implements LoginModule {
 
         /*
          * When sun.security.jgss.native=false (i.e., not using the system's
-         * native C/ELF/DLL GSS implementation) then there's nothing for this
-         * login module to do.  Otherwise we'd get into an infinite recursion
-         * problem due to re-entering GssLoginModule like this:
+         * native C/ELF/DLL GSS implementation) there's a potential for
+         * infinite recursion:
          *
          * Application -> LoginContext -> GssLoginModule -> Krb5 ->
          *      GSSUtil.login -> LoginContext -> GssLoginModule -> ...
          *
-         * It stands to reason that when sun.security.jgss.native=false the
-         * login modules corresponding to the actual GSS mechanisms coded in
-         * Java are the ones that should be acquiring their corresponding
-         * credentials.
+         * However, when credential store options are provided (ccache, keytab,
+         * client_keytab, password), the Java Kerberos mechanism can acquire
+         * credentials directly without triggering JAAS login recursion.
          *
-         * A policy like "let the application use GSS credentials but not the
-         * raw, underlying Krb5 credentials" when
-         * sun.security.jgss.native=false" could be expressible by adding a
-         * module option to Krb5LoginModule that causes it to add only GSS
-         * credentials to the Subject, not Krb5 credentials.
-         *
-         * (It has never been possible to express such a policy, so we lose
-         * nothing by punting here when sun.security.jgss.native=false.)
+         * So we continue initialization regardless of useNative, but in login()
+         * we check: if !useNative AND no cred store options, then bail out.
          */
         useNative = Boolean.getBoolean("sun.security.jgss.native");
-        if (!useNative)
-            return;
 
         manager = GSSManager.getInstance();
 
@@ -453,15 +443,34 @@ public class GssLoginModule implements LoginModule {
      * @exception LoginException if this <code>LoginModule</code>
      *          is unable to perform the authentication.</p>
      */
+    /**
+     * Check if cred store options are provided that allow us to acquire
+     * credentials directly without JAAS recursion.
+     */
+    private boolean hasCredStoreOptions() {
+        return store.containsKey("ccache") ||
+               store.containsKey("keytab") ||
+               store.containsKey("client_keytab") ||
+               store.containsKey("password");
+    }
+
     public boolean login() throws LoginException {
         succeeded = false;
 
         /*
-         * See commentary in initialize().  By returning false we cause
-         * LoginContext to ignore this module.
+         * When not using native GSS, we can only proceed if credential store
+         * options are provided (ccache, keytab, client_keytab, password).
+         * Without cred store options, the Java Kerberos mechanism would try
+         * to do JAAS login internally, causing infinite recursion.
+         *
+         * By returning false we cause LoginContext to ignore this module,
+         * allowing mechanism-specific login modules (like Krb5LoginModule)
+         * to handle credential acquisition instead.
          */
-        if (!useNative)
+        if (!useNative && !hasCredStoreOptions()) {
+            trace("Not using native GSS and no cred store options - skipping");
             return false;
+        }
         try {
             if (tryFirstPass || useFirstPass) {
                 attemptAuthentication(true);
@@ -732,9 +741,8 @@ public class GssLoginModule implements LoginModule {
         if (succeeded == false)
             return false;
 
-        if (!useNative)
-            return false;
-
+        // If login() succeeded, we have credentials to commit regardless of
+        // whether we used native GSS or Java GSS with cred store options.
         succeeded = false;
         if (initiate && (gssICred == null)) {
             gssName = null;
@@ -830,11 +838,9 @@ public class GssLoginModule implements LoginModule {
      *          should not be ignored.</p>
      */
     public boolean logout() throws LoginException {
-        /*
-         * See commentary in initialize().  By returning false we cause
-         * LoginContext to ignore this module.
-         */
-        if (!useNative)
+        // If we never committed any credentials (gssName is null and no creds),
+        // there's nothing to logout.
+        if (gssName == null && gssICred == null && gssACred == null)
             return false;
 
         if (subject.isReadOnly())

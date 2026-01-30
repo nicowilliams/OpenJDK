@@ -29,9 +29,11 @@ import org.ietf.jgss.*;
 import sun.security.jgss.GSSUtil;
 import sun.security.jgss.GSSCaller;
 import sun.security.jgss.spi.*;
+import java.io.File;
 import java.security.Provider;
 import java.util.Vector;
 import java.util.Map;
+import javax.security.auth.kerberos.KeyTab;
 
 /**
  * Krb5 Mechanism plug in for JGSS
@@ -98,17 +100,21 @@ public final class Krb5MechFactory implements MechanismFactory {
            String password, int initLifetime, int acceptLifetime,
            int usage) throws GSSException {
 
-        if (password != null) {
-            // XXX Implement!  Shouldn't be too hard...
-            throw new GSSException(GSSException.UNAVAILABLE, -1,
-                    "The Kerberos mechanism Java implementation does not " +
-                    "currently support acquiring GSS credentials handle " +
-                    "elements with a password");
-        }
-
         if (name != null && !(name instanceof Krb5NameElement)) {
             name = Krb5NameElement.getInstance(name.toString(),
                                        name.getStringNameType());
+        }
+
+        // If password is provided, use it directly
+        if (password != null) {
+            if (usage == GSSCredential.ACCEPT_ONLY) {
+                throw new GSSException(GSSException.UNAVAILABLE, -1,
+                    "Password-based acceptor credentials are not supported");
+            }
+            Krb5CredElement credElement = Krb5InitCredential.getInstance(
+                caller, (Krb5NameElement) name, password.toCharArray());
+            return Krb5ProxyCredential.tryImpersonation(
+                caller, (Krb5InitCredential)credElement);
         }
 
         Krb5CredElement credElement = getCredFromSubject
@@ -137,6 +143,91 @@ public final class Krb5MechFactory implements MechanismFactory {
         throws GSSException {
         return getCredentialElement(name, (Map<String,String>)null,
             initLifetime, acceptLifetime, usage);
+    }
+
+    /**
+     * Acquires a credential element using a credential store.
+     * Supported cred store keys (MIT Kerberos compatible):
+     * <ul>
+     *   <li>ccache - credential cache file path (initiator)</li>
+     *   <li>client_keytab - keytab for initiator credentials</li>
+     *   <li>keytab - keytab for acceptor credentials</li>
+     *   <li>password - password for initiator credentials</li>
+     * </ul>
+     */
+    public GSSCredentialSpi getCredentialElement(GSSNameSpi name,
+                                                 Map<String,String> store,
+                                                 int initLifetime,
+                                                 int acceptLifetime,
+                                                 int usage)
+        throws GSSException {
+
+        // If no store provided, fall back to default behavior
+        if (store == null || store.isEmpty()) {
+            return getCredentialElement(name, (String)null,
+                initLifetime, acceptLifetime, usage);
+        }
+
+        if (name != null && !(name instanceof Krb5NameElement)) {
+            name = Krb5NameElement.getInstance(name.toString(),
+                                       name.getStringNameType());
+        }
+
+        // Extract cred store options
+        String ccache = store.get("ccache");
+        String clientKeytab = store.get("client_keytab");
+        String keytab = store.get("keytab");
+        String password = store.get("password");
+
+        Krb5CredElement credElement = null;
+
+        if (usage == GSSCredential.INITIATE_ONLY ||
+            usage == GSSCredential.INITIATE_AND_ACCEPT) {
+
+            // Priority: password > ccache > client_keytab > default
+            if (password != null) {
+                credElement = Krb5InitCredential.getInstance(
+                    caller, (Krb5NameElement) name, password.toCharArray());
+            } else if (ccache != null) {
+                credElement = Krb5InitCredential.getInstance(
+                    caller, (Krb5NameElement) name, ccache);
+            } else if (clientKeytab != null) {
+                KeyTab ktab = KeyTab.getInstance(new File(clientKeytab));
+                credElement = Krb5InitCredential.getInstance(
+                    caller, (Krb5NameElement) name, ktab);
+            } else {
+                // Fall back to default behavior
+                credElement = getCredFromSubject(name, true);
+                if (credElement == null) {
+                    credElement = Krb5InitCredential.getInstance(
+                        caller, (Krb5NameElement) name, initLifetime);
+                }
+            }
+            credElement = Krb5ProxyCredential.tryImpersonation(
+                caller, (Krb5InitCredential)credElement);
+        }
+
+        if (usage == GSSCredential.ACCEPT_ONLY) {
+            if (keytab != null) {
+                KeyTab ktab = KeyTab.getInstance(new File(keytab));
+                credElement = Krb5AcceptCredential.getInstance(
+                    caller, (Krb5NameElement) name, ktab);
+            } else {
+                // Fall back to default behavior
+                credElement = getCredFromSubject(name, false);
+                if (credElement == null) {
+                    credElement = Krb5AcceptCredential.getInstance(
+                        caller, (Krb5NameElement) name);
+                }
+            }
+        }
+
+        if (credElement == null) {
+            throw new GSSException(GSSException.FAILURE, -1,
+                                   "Unknown usage mode requested");
+        }
+
+        return credElement;
     }
 
     public void storeCredInto(GSSCredentialSpi cred, int usage,
