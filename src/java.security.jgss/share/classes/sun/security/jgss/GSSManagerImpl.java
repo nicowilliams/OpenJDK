@@ -144,6 +144,15 @@ public class GSSManagerImpl extends GSSManager {
             usage);
     }
 
+    @Override
+    public GSSCredential createCredential(GSSName aName,
+                                          Iterable<Map.Entry<String,String>> store,
+                                          int lifetime, Oid mech, int usage)
+        throws GSSException {
+        return new GSSCredentialImpl(this, aName, store, lifetime, mech,
+            usage);
+    }
+
     public GSSCredential createCredential(GSSName aName, String password,
                                           int lifetime, Oid mech, int usage)
         throws GSSException {
@@ -166,6 +175,15 @@ public class GSSManagerImpl extends GSSManager {
 
     public GSSCredential createCredential(GSSName aName,
                                           Map<String,String> store,
+                                          int lifetime, Oid mechs[], int usage)
+        throws GSSException {
+        return new GSSCredentialImpl(this, aName, store,
+                lifetime, mechs, usage);
+    }
+
+    @Override
+    public GSSCredential createCredential(GSSName aName,
+                                          Iterable<Map.Entry<String,String>> store,
                                           int lifetime, Oid mechs[], int usage)
         throws GSSException {
         return new GSSCredentialImpl(this, aName, store,
@@ -219,6 +237,17 @@ public class GSSManagerImpl extends GSSManager {
 
     public GSSCredentialSpi getCredentialElement(GSSNameSpi name,
                                                  Map<String,String> store,
+                                                 int initLifetime,
+                                                 int acceptLifetime,
+                                                 Oid mech, int usage)
+        throws GSSException {
+        MechanismFactory factory = list.getMechFactory(mech);
+        return factory.getCredentialElement(name, store, initLifetime,
+                                            acceptLifetime, usage);
+    }
+
+    public GSSCredentialSpi getCredentialElement(GSSNameSpi name,
+                                                 Iterable<Map.Entry<String,String>> store,
                                                  int initLifetime,
                                                  int acceptLifetime,
                                                  Oid mech, int usage)

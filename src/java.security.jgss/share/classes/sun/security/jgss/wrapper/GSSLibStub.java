@@ -127,16 +127,38 @@ class GSSLibStub {
         }
         return l.toArray(new String[0]);
     }
+    private static String[] iterable2array(Iterable<Map.Entry<String,String>> iter) {
+        if (iter == null)
+            return null;
+        ArrayList<String> l = new ArrayList<String>();
+        for (var e : iter) {
+            l.add(e.getKey());
+            l.add(e.getValue());
+        }
+        return l.toArray(new String[0]);
+    }
     public long acquireCred(long pName, String password,
                             Map<String,String> store,
                             int lifetime, int usage) throws GSSException {
         return acquireCred(pName, password, map2array(store), lifetime, usage);
+    }
+    public long acquireCred(long pName, String password,
+                            Iterable<Map.Entry<String,String>> store,
+                            int lifetime, int usage) throws GSSException {
+        return acquireCred(pName, password, iterable2array(store), lifetime, usage);
     }
     public long storeCred(long pCred, int usage, Oid mech,
                           boolean overwrite, boolean defaultCred,
                           Map<String,String> store) throws GSSException {
         return storeCred(pCred, usage, mech, overwrite, defaultCred,
             map2array(store));
+    }
+    public long storeCred(long pCred, int usage, Oid mech,
+                          boolean overwrite, boolean defaultCred,
+                          Iterable<Map.Entry<String,String>> store)
+        throws GSSException {
+        return storeCred(pCred, usage, mech, overwrite, defaultCred,
+            iterable2array(store));
     }
     public boolean equals(Object obj) {
         if (obj == this) return true;

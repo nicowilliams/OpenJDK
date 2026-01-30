@@ -85,6 +85,16 @@ public class GSSCredentialImpl implements GSSCredential {
         add(name, store, lifetime, lifetime, mech, usage);
     }
 
+    GSSCredentialImpl(GSSManagerImpl gssManager, GSSName name,
+                      Iterable<Map.Entry<String,String>> store, int lifetime,
+                      Oid mech, int usage)
+        throws GSSException {
+        if (mech == null) mech = ProviderList.DEFAULT_MECH_OID;
+
+        init(gssManager);
+        add(name, store, lifetime, lifetime, mech, usage);
+    }
+
     GSSCredentialImpl(GSSManagerImpl gssManager, GSSName name, String password,
                       int lifetime, Oid mech, int usage)
         throws GSSException {
@@ -102,6 +112,33 @@ public class GSSCredentialImpl implements GSSCredential {
 
     GSSCredentialImpl(GSSManagerImpl gssManager, GSSName name,
                       Map<String,String> store, int lifetime,
+                      Oid mechs[], int usage)
+        throws GSSException {
+        init(gssManager);
+        boolean defaultList = false;
+        if (mechs == null) {
+            mechs = gssManager.getMechs();
+            defaultList = true;
+        }
+
+        for (int i = 0; i < mechs.length; i++) {
+            try {
+                add(name, store, lifetime, lifetime, mechs[i], usage);
+            } catch (GSSException e) {
+                if (defaultList) {
+                    // Try the next mechanism
+                    GSSUtil.debug("Ignore " + e + " while acquring cred for "
+                        + mechs[i]);
+                    //e.printStackTrace();
+                } else throw e; // else try the next mechanism
+            }
+        }
+        if ((hashtable.size() == 0) || (usage != getUsage()))
+            throw new GSSException(GSSException.NO_CRED);
+    }
+
+    GSSCredentialImpl(GSSManagerImpl gssManager, GSSName name,
+                      Iterable<Map.Entry<String,String>> store, int lifetime,
                       Oid mechs[], int usage)
         throws GSSException {
         init(gssManager);
@@ -469,6 +506,13 @@ public class GSSCredentialImpl implements GSSCredential {
             mech, usage);
     }
 
+    public void add(GSSName name, Iterable<Map.Entry<String,String>> store,
+                    int initLifetime, int acceptLifetime, Oid mech, int usage)
+                    throws GSSException {
+        add(name, (String)null, store, initLifetime, acceptLifetime,
+            mech, usage);
+    }
+
     public void add(GSSName name, String password, int initLifetime,
                     int acceptLifetime, Oid mech, int usage)
                     throws GSSException {
@@ -532,6 +576,100 @@ public class GSSCredentialImpl implements GSSCredential {
          * call to getCredentialElement, this time with the other usage
          * mode.
          */
+
+        if (tempCred != null) {
+            if (usage == GSSCredential.INITIATE_AND_ACCEPT &&
+                (!tempCred.isAcceptorCredential() ||
+                !tempCred.isInitiatorCredential())) {
+
+                int currentUsage;
+                int desiredUsage;
+
+                if (!tempCred.isInitiatorCredential()) {
+                    currentUsage = GSSCredential.ACCEPT_ONLY;
+                    desiredUsage = GSSCredential.INITIATE_ONLY;
+                } else {
+                    currentUsage = GSSCredential.INITIATE_ONLY;
+                    desiredUsage = GSSCredential.ACCEPT_ONLY;
+                }
+
+                key = new SearchKey(mech, currentUsage);
+                hashtable.put(key, tempCred);
+
+                if (store == null && password == null) {
+                    tempCred = gssManager.getCredentialElement(nameElement,
+                                                               initLifetime,
+                                                               acceptLifetime,
+                                                               mech,
+                                                               desiredUsage);
+                } else if (password != null) {
+                    tempCred = gssManager.getCredentialElement(nameElement,
+                                                               password,
+                                                               initLifetime,
+                                                               acceptLifetime,
+                                                               mech,
+                                                               desiredUsage);
+                } else {
+                    tempCred = gssManager.getCredentialElement(nameElement,
+                                                               store,
+                                                               initLifetime,
+                                                               acceptLifetime,
+                                                               mech,
+                                                               desiredUsage);
+                }
+
+                key = new SearchKey(mech, desiredUsage);
+                hashtable.put(key, tempCred);
+            } else {
+                hashtable.put(key, tempCred);
+            }
+        }
+    }
+
+    private void add(GSSName name, String password,
+                    Iterable<Map.Entry<String,String>> store,
+                    int initLifetime, int acceptLifetime, Oid mech, int usage)
+                    throws GSSException {
+
+        if (destroyed) {
+            throw new IllegalStateException("This credential is " +
+                                        "no longer valid");
+        }
+        if (mech == null) mech = ProviderList.DEFAULT_MECH_OID;
+
+        SearchKey key = new SearchKey(mech, usage);
+        if (hashtable.containsKey(key)) {
+            throw new GSSExceptionImpl(GSSException.DUPLICATE_ELEMENT,
+                                       "Duplicate element found: " +
+                                       getElementStr(mech, usage));
+        }
+
+        // XXX If not instance of GSSNameImpl then throw exception
+        // Application mixing GSS implementations
+        GSSNameSpi nameElement = (name == null ? null :
+                                  ((GSSNameImpl)name).getElement(mech));
+
+        if (password == null && store == null) {
+            tempCred = gssManager.getCredentialElement(nameElement,
+                                                       initLifetime,
+                                                       acceptLifetime,
+                                                       mech,
+                                                       usage);
+        } else if (password != null) {
+            tempCred = gssManager.getCredentialElement(nameElement,
+                                                       password,
+                                                       initLifetime,
+                                                       acceptLifetime,
+                                                       mech,
+                                                       usage);
+        } else {
+            tempCred = gssManager.getCredentialElement(nameElement,
+                                                       store,
+                                                       initLifetime,
+                                                       acceptLifetime,
+                                                       mech,
+                                                       usage);
+        }
 
         if (tempCred != null) {
             if (usage == GSSCredential.INITIATE_AND_ACCEPT &&
@@ -730,6 +868,31 @@ public class GSSCredentialImpl implements GSSCredential {
     public void storeInto(int usage, Oid mech,
                           boolean overwrite, boolean defaultCred,
                           Map<String,String> store) throws GSSException {
+        if (destroyed) {
+            throw new IllegalStateException("This credential is " +
+                                            "no longer valid");
+        }
+
+        SearchKey key = null;
+        GSSCredentialSpi element = null;
+
+        if (mech == null) {
+            mech = ProviderList.DEFAULT_MECH_OID;
+        }
+
+        key = new SearchKey(mech, usage);
+        element = hashtable.get(key);
+        if (element == null) {
+            throw new GSSExceptionImpl(GSSException.BAD_MECH, mech);
+        }
+
+        element.storeInto(usage, overwrite, defaultCred, store);
+    }
+
+    public void storeInto(int usage, Oid mech,
+                          boolean overwrite, boolean defaultCred,
+                          Iterable<Map.Entry<String,String>> store)
+        throws GSSException {
         if (destroyed) {
             throw new IllegalStateException("This credential is " +
                                             "no longer valid");

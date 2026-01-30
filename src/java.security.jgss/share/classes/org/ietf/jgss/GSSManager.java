@@ -25,6 +25,7 @@
 
 package org.ietf.jgss;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.security.Provider;
 
@@ -525,6 +526,60 @@ public abstract class GSSManager {
         throws GSSException;
 
     /**
+     * Factory method for acquiring a single mechanism credential from
+     * an external credential store, where the store is represented as an
+     * iterable of key-value pairs that may contain duplicate keys.<p>
+     *
+     * This method is similar to
+     * {@link #createCredential(GSSName, Map, int, Oid, int)} but accepts
+     * an {@code Iterable} of {@code Map.Entry} objects instead of a
+     * {@code Map}. This allows duplicate keys, which is useful for some
+     * credential store options (e.g., multiple keytab files).<p>
+     *
+     * The default implementation converts the iterable to a {@code Map},
+     * which will lose duplicate keys (later values overwrite earlier ones).
+     * Subclasses that support duplicate keys should override this method.<p>
+     *
+     * @param name the name of the principal for whom this credential is to be
+     * acquired.  Use <code>null</code> to specify the default principal.
+     * @param store An iterable of key-value pairs describing an external
+     * credential store. Common keys include "keytab", "client_keytab",
+     * "ccache", and "password". Unlike the Map-based variant, this allows
+     * duplicate keys.
+     * @param lifetime The number of seconds that credentials should remain
+     * valid.
+     * @param mech the Oid of the desired mechanism.
+     * @param usage The intended usage for this credential object.
+     * @return a GSSCredential of the requested type.
+     *
+     * @see #createCredential(GSSName, Map, int, Oid, int)
+     *
+     * @throws GSSException containing the following
+     * major error codes:
+     *    {@link GSSException#BAD_MECH GSSException.BAD_MECH},
+     *    {@link GSSException#BAD_NAMETYPE GSSException.BAD_NAMETYPE},
+     *    {@link GSSException#BAD_NAME GSSException.BAD_NAME},
+     *    {@link GSSException#CREDENTIALS_EXPIRED
+     *                                   GSSException.CREDENTIALS_EXPIRED},
+     *    {@link GSSException#NO_CRED GSSException.NO_CRED},
+     *    {@link GSSException#FAILURE GSSException.FAILURE}
+     */
+    public GSSCredential createCredential(GSSName name,
+                                  Iterable<Map.Entry<String,String>> store,
+                                  int lifetime, Oid mech, int usage)
+        throws GSSException {
+        // Default implementation: convert to Map (loses duplicate keys)
+        Map<String,String> map = null;
+        if (store != null) {
+            map = new HashMap<>();
+            for (Map.Entry<String,String> entry : store) {
+                map.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return createCredential(name, map, lifetime, mech, usage);
+    }
+
+    /**
      * Factory method for acquiring credentials over a set of
      * mechanisms. This method attempts to acquire credentials for
      * each of the mechanisms specified in the array called mechs.  To
@@ -693,6 +748,61 @@ public abstract class GSSManager {
                                       Map<String,String> store, int lifetime,
                                       Oid mechs[], int usage)
         throws GSSException;
+
+    /**
+     * Factory method for acquiring credentials with a "credential
+     * store" over a set of mechanisms, where the store is represented as an
+     * iterable of key-value pairs that may contain duplicate keys.<p>
+     *
+     * This method is similar to
+     * {@link #createCredential(GSSName, Map, int, Oid[], int)} but accepts
+     * an {@code Iterable} of {@code Map.Entry} objects instead of a
+     * {@code Map}. This allows duplicate keys, which is useful for some
+     * credential store options (e.g., multiple keytab files).<p>
+     *
+     * The default implementation converts the iterable to a {@code Map},
+     * which will lose duplicate keys (later values overwrite earlier ones).
+     * Subclasses that support duplicate keys should override this method.<p>
+     *
+     * @param name the name of the principal for whom this credential is to
+     * be acquired.  Use <code>null</code> to specify the default principal.
+     * @param store An iterable of key-value pairs describing an external
+     * credential store. Common keys include "keytab", "client_keytab",
+     * "ccache", and "password". Unlike the Map-based variant, this allows
+     * duplicate keys.
+     * @param lifetime The number of seconds that credentials should remain
+     * valid.
+     * @param mechs an array of Oid's indicating the mechanisms over which
+     * the credential is to be acquired.
+     * @param usage The intended usage for this credential object.
+     * @return a GSSCredential of the requested type.
+     *
+     * @see #createCredential(GSSName, Map, int, Oid[], int)
+     *
+     * @throws GSSException containing the following
+     * major error codes:
+     *    {@link GSSException#BAD_MECH GSSException.BAD_MECH},
+     *    {@link GSSException#BAD_NAMETYPE GSSException.BAD_NAMETYPE},
+     *    {@link GSSException#BAD_NAME GSSException.BAD_NAME},
+     *    {@link GSSException#CREDENTIALS_EXPIRED
+     *                                   GSSException.CREDENTIALS_EXPIRED},
+     *    {@link GSSException#NO_CRED GSSException.NO_CRED},
+     *    {@link GSSException#FAILURE GSSException.FAILURE}
+     */
+    public GSSCredential createCredential(GSSName name,
+                                      Iterable<Map.Entry<String,String>> store,
+                                      int lifetime, Oid mechs[], int usage)
+        throws GSSException {
+        // Default implementation: convert to Map (loses duplicate keys)
+        Map<String,String> map = null;
+        if (store != null) {
+            map = new HashMap<>();
+            for (Map.Entry<String,String> entry : store) {
+                map.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return createCredential(name, map, lifetime, mechs, usage);
+    }
 
     /**
      * Factory method for creating a context on the initiator's

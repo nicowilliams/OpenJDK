@@ -84,6 +84,33 @@ public class GSSCredElement implements GSSCredentialSpi {
         this(name, (String)null, store, lifetime, usage, stub);
     }
 
+    private GSSCredElement(GSSNameElement name, String password,
+                           Iterable<Map.Entry<String,String>> store,
+                           int lifetime, int usage, GSSLibStub stub)
+        throws GSSException {
+        cStub = stub;
+        this.usage = usage;
+
+        if (name != null) { // Could be GSSNameElement.DEF_ACCEPTOR
+            this.name = name;
+            pCred = cStub.acquireCred(this.name.pName, password, store,
+                lifetime, usage);
+            if (name == GSSNameElement.DEF_ACCEPTOR)
+                isDefCred = true;
+        } else {
+            pCred = cStub.acquireCred(0, password, store, lifetime, usage);
+            this.name = new GSSNameElement(cStub.getCredName(pCred), cStub.getMech(), cStub);
+            isDefCred = true;
+        }
+
+        cleanable = Krb5Util.cleaner.register(this, disposerFor(cStub, pCred));
+    }
+
+    GSSCredElement(GSSNameElement name, Iterable<Map.Entry<String,String>> store,
+                   int lifetime, int usage, GSSLibStub stub) throws GSSException {
+        this(name, (String)null, store, lifetime, usage, stub);
+    }
+
     GSSCredElement(GSSNameElement name, String password, int lifetime,
                    int usage, GSSLibStub stub) throws GSSException {
         this(name, password, (Map<String,String>)null, lifetime, usage, stub);
@@ -96,6 +123,14 @@ public class GSSCredElement implements GSSCredentialSpi {
 
     public void storeInto(int usage, boolean overwrite, boolean defaultCred,
                           Map<String,String> store)
+            throws GSSException {
+        cStub.storeCred(pCred, usage, getMechanism(), overwrite,
+                        defaultCred, store);
+    }
+
+    @Override
+    public void storeInto(int usage, boolean overwrite, boolean defaultCred,
+                          Iterable<Map.Entry<String,String>> store)
             throws GSSException {
         cStub.storeCred(pCred, usage, getMechanism(), overwrite,
                         defaultCred, store);

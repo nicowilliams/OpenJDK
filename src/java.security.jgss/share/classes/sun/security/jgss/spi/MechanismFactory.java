@@ -27,6 +27,7 @@ package sun.security.jgss.spi;
 
 import org.ietf.jgss.*;
 import java.security.Provider;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -229,6 +230,56 @@ public interface MechanismFactory {
         throws GSSException;
 
     /**
+     * Creates a credential element using a "credential store" for this
+     * mechanism, where the store is represented as an iterable of key-value
+     * pairs that may contain duplicate keys.
+     *
+     * <p>This method is similar to
+     * {@link #getCredentialElement(GSSNameSpi, Map, int, int, int)} but
+     * accepts an {@code Iterable} of {@code Map.Entry} objects instead of
+     * a {@code Map}. This allows duplicate keys, which is useful for
+     * some credential store options (e.g., multiple keytab files).</p>
+     *
+     * <p>The default implementation converts the iterable to a {@code Map},
+     * which will lose duplicate keys (later values overwrite earlier ones).
+     * Mechanisms that support duplicate keys should override this method.</p>
+     *
+     * @param name the mechanism level name element for the entity whose
+     * credential is desired. A null value indicates that a mechanism
+     * dependent default choice is to be made.
+     * @param store an iterable of key-value pairs. Common keys include
+     * "keytab", "client_keytab", "ccache", and "password". Unlike the
+     * Map-based variant, this allows duplicate keys.
+     * @param initLifetime indicates the lifetime (in seconds) that is
+     * requested for this credential to be used at the context initiator's
+     * end. This value should be ignored if the usage is ACCEPT_ONLY.
+     * @param acceptLifetime indicates the lifetime (in seconds) that is
+     * requested for this credential to be used at the context acceptor's
+     * end. This value should be ignored if the usage is INITIATE_ONLY.
+     * @param usage One of the values GSSCredential.INIATE_ONLY,
+     * GSSCredential.ACCEPT_ONLY, and GSSCredential.INITIATE_AND_ACCEPT.
+     * @see org.ietf.jgss.GSSCredential
+     * @throws GSSException if one of the error situations described in RFC
+     * 2743 with the GSS_Acquire_Cred or GSS_Add_Cred calls occurs.
+     */
+    default GSSCredentialSpi getCredentialElement(GSSNameSpi name,
+                                                  Iterable<Map.Entry<String,String>> store,
+                                                  int initLifetime,
+                                                  int acceptLifetime,
+                                                  int usage)
+        throws GSSException {
+        // Default implementation: convert to Map (loses duplicate keys)
+        Map<String,String> map = null;
+        if (store != null) {
+            map = new HashMap<>();
+            for (Map.Entry<String,String> entry : store) {
+                map.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return getCredentialElement(name, map, initLifetime, acceptLifetime, usage);
+    }
+
+    /**
      * Stores a credential element into a specified location.
      *
      * @param cred The credential element to store.
@@ -246,6 +297,39 @@ public interface MechanismFactory {
                 "The " + getMechanismOid() + "mechanism does not " +
                 "currently support storing GSS credentials handle " +
                 "elements into a \"credential store\"");
+    }
+
+    /**
+     * Stores a credential element into a specified location, where the
+     * store is represented as an iterable of key-value pairs that may
+     * contain duplicate keys.
+     *
+     * <p>The default implementation converts the iterable to a {@code Map},
+     * which will lose duplicate keys (later values overwrite earlier ones).
+     * Mechanisms that support duplicate keys should override this method.</p>
+     *
+     * @param cred The credential element to store.
+     * @param usage The credential usage to store.
+     * @param overwrite Whether to overwrite credentials found at the specified
+     * location.
+     * @param defaultCred Whether to store the credentials as the default
+     * credentials in the specified location.
+     * @param store The location into which to store the credentials, as an
+     * iterable of key-value pairs that may contain duplicate keys.
+     */
+    default void storeCredInto(GSSCredentialSpi cred, int usage,
+                              boolean overwrite, boolean defaultCred,
+                              Iterable<Map.Entry<String,String>> store)
+        throws GSSException {
+        // Default implementation: convert to Map (loses duplicate keys)
+        Map<String,String> map = null;
+        if (store != null) {
+            map = new HashMap<>();
+            for (Map.Entry<String,String> entry : store) {
+                map.put(entry.getKey(), entry.getValue());
+            }
+        }
+        storeCredInto(cred, usage, overwrite, defaultCred, map);
     }
 
     /**

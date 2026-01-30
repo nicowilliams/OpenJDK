@@ -25,6 +25,7 @@
 
 package org.ietf.jgss;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -370,6 +371,45 @@ public interface GSSCredential extends Cloneable{
     public void storeInto(int usage, Oid mech,
                           boolean overwrite, boolean defaultCred,
                           Map<String,String> store) throws GSSException;
+
+    /**
+     * Stores a credential element into an external credential store,
+     * where the store is represented as an iterable of key-value pairs
+     * that may contain duplicate keys.
+     *
+     * <p>This method is similar to
+     * {@link #storeInto(int, Oid, boolean, boolean, Map)} but accepts
+     * an {@code Iterable} of {@code Map.Entry} objects instead of a
+     * {@code Map}. This allows duplicate keys, which is useful for some
+     * credential store options.</p>
+     *
+     * <p>The default implementation converts the iterable to a {@code Map},
+     * which will lose duplicate keys (later values overwrite earlier ones).
+     * Implementations that support duplicate keys should override this method.</p>
+     *
+     * @param usage The credential usage to store.
+     * @param mech The mechanism element of the credential to store.
+     * @param overwrite Whether to overwrite any existing credentials in
+     * the external store.
+     * @param defaultCred Whether to make the credential to be stored
+     * also be the default credential in the external store.
+     * @param store An iterable of key-value pairs describing the external
+     * store. Unlike the Map-based variant, this allows duplicate keys.
+     */
+    default void storeInto(int usage, Oid mech,
+                          boolean overwrite, boolean defaultCred,
+                          Iterable<Map.Entry<String,String>> store)
+        throws GSSException {
+        // Default implementation: convert to Map (loses duplicate keys)
+        Map<String,String> map = null;
+        if (store != null) {
+            map = new HashMap<>();
+            for (Map.Entry<String,String> entry : store) {
+                map.put(entry.getKey(), entry.getValue());
+            }
+        }
+        storeInto(usage, mech, overwrite, defaultCred, map);
+    }
 
     /**
      * Tests if this GSSCredential asserts the same entity as the supplied

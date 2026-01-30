@@ -27,6 +27,7 @@ package sun.security.jgss.spi;
 
 import org.ietf.jgss.*;
 import java.security.Provider;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -123,6 +124,37 @@ public interface GSSCredentialSpi {
                 "The " + getMechanism() + "mechanism does not " +
                 "currently support storing GSS credentials handle " +
                 "elements into a \"credential store\"");
+    }
+
+    /**
+     * Stores a credential in the location specified by the store
+     * argument, where the store is represented as an iterable of key-value
+     * pairs that may contain duplicate keys.
+     *
+     * <p>The default implementation converts the iterable to a {@code Map},
+     * which will lose duplicate keys (later values overwrite earlier ones).
+     * Implementations that support duplicate keys should override this method.</p>
+     *
+     * @param usage The credential usage to store.
+     * @param overwrite Whether to overwrite any credential found at the
+     * given store location.
+     * @param defaultCred Whether to make the credential the default
+     * credential in the store at the given location.
+     * @param store An iterable of key-value pairs specifying a store location.
+     * Unlike the Map-based variant, this allows duplicate keys.
+     */
+    default void storeInto(int usage, boolean overwrite, boolean defaultCred,
+                           Iterable<Map.Entry<String,String>> store)
+        throws GSSException {
+        // Default implementation: convert to Map (loses duplicate keys)
+        Map<String,String> map = null;
+        if (store != null) {
+            map = new HashMap<>();
+            for (Map.Entry<String,String> entry : store) {
+                map.put(entry.getKey(), entry.getValue());
+            }
+        }
+        storeInto(usage, overwrite, defaultCred, map);
     }
 
     /**
