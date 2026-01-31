@@ -693,8 +693,8 @@ public class Krb5LoginModule implements LoginModule {
                         debug.println
                             ("null credentials from Ticket Cache");
                     }
-                } else if (debug) {
-                    System.out.println("Could not find cached credentials");
+                } else if (debug != null) {
+                    debug.println("Could not find cached credentials");
                 }
             }
 
@@ -1099,9 +1099,10 @@ public class Krb5LoginModule implements LoginModule {
 
             Set<Object> privCredSet =  subject.getPrivateCredentials();
             Set<java.security.Principal> princSet  = subject.getPrincipals();
-            kerbClientPrinc = new KerberosPrincipal(principal.getName());
+            KerberosPrincipal kerbClientPrinc = new KerberosPrincipal(principal.getName());
 
             // create Kerberos Ticket
+            KerberosTicket kerbTicket = null;
             if (isInitiator) {
                 kerbTicket = Krb5Util.credsToTicket(cred);
                 if (cred.getProxy() != null) {

@@ -195,8 +195,8 @@ class NativeGSSContext implements GSSContextSpi {
         if (info.length != NUM_OF_INQUIRE_VALUES) {
             throw new RuntimeException("Bug w/ GSSLibStub.inquireContext()");
         }
-        srcName = new GSSNameElement(info[0], cStub);
-        targetName = new GSSNameElement(info[1], cStub);
+        srcName = new GSSNameElement(info[0], cStub.getMech(), cStub);
+        targetName = new GSSNameElement(info[1], cStub.getMech(), cStub);
         isInitiator = (info[2] != 0);
         isEstablished = (info[3] != 0);
         flags = (int) info[4];
@@ -239,7 +239,7 @@ class NativeGSSContext implements GSSContextSpi {
             if (isEstablished) {
                 if (srcName == null) {
                     srcName = new GSSNameElement
-                        (cStub.getContextName(pContext, true), cStub);
+                        (cStub.getContextName(pContext, true), cStub.getMech(), cStub);
                 }
                 if (cred == null) {
                     disposeCred = cred =
@@ -270,7 +270,7 @@ class NativeGSSContext implements GSSContextSpi {
 
             if (targetName == null) {
                 targetName = new GSSNameElement
-                    (cStub.getContextName(pContext, false), cStub);
+                    (cStub.getContextName(pContext, false), cStub.getMech(), cStub);
                 // Replace the current default acceptor cred now that
                 // the context acceptor name is available
                 if (disposeCred != null) {
