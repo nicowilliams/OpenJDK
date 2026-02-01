@@ -178,7 +178,7 @@ jobs:
           --with-sysroot=${{ env.SYSROOT_PATH }}
           --with-extra-cflags=--sysroot=${{ env.SYSROOT_PATH }}
           --with-extra-cxxflags=--sysroot=${{ env.SYSROOT_PATH }}
-          --with-extra-ldflags="--sysroot=${{ env.SYSROOT_PATH }} -L$PWD/sysroot-focal/lib/x86_64-linux-gnu -Wl,-rpath-link,$PWD/sysroot-focal/lib/x86_64-linux-gnu"
+          --with-extra-ldflags="--sysroot=${{ env.SYSROOT_PATH }} -L$PWD/sysroot-focal/lib/x86_64-linux-gnu -Wl,-rpath-link,$PWD/sysroot-focal/lib/x86_64-linux-gnu -lpthread"
           ${{ inputs.extra-conf-options }} ${{ inputs.configure-arguments }} || (
           echo "Dumping config.log:" &&
           cat config.log &&
