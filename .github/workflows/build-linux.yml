@@ -133,6 +133,55 @@ jobs:
           echo "=== Checking /usr/lib path ==="
           ls -la sysroot-focal/usr/lib/x86_64-linux-gnu/libpthread* sysroot-focal/usr/lib/x86_64-linux-gnu/libdl* 2>/dev/null || echo "Files not found in /usr/lib"
 
+      - name: 'Fix absolute symlinks in sysroot'
+        run: |
+          set -vx
+          cd sysroot-focal
+
+          # Convert absolute symlinks to relative ones
+          # This is what the 'symlinks -cr' tool does, but done manually
+          # since symlinks package isn't available in Focal
+          echo "=== Converting absolute symlinks to relative ==="
+          find . -type l | while read link; do
+            target=$(readlink "$link")
+            if [[ "$target" == /* ]]; then
+              # It's an absolute symlink - convert to relative
+              link_dir=$(dirname "$link")
+              # Calculate relative path from link location to target
+              # The target is absolute within sysroot, so we need to make it relative
+              rel_target=$(realpath --relative-to="$link_dir" ".$target" 2>/dev/null || echo "")
+              if [ -n "$rel_target" ] && [ -e "$link_dir/$rel_target" ]; then
+                echo "Converting: $link -> $target => $rel_target"
+                rm "$link"
+                ln -s "$rel_target" "$link"
+              fi
+            fi
+          done
+
+          # Also patch linker scripts (text files with GROUP directives)
+          # that contain absolute paths - same as make/devkit/Tools.gmk
+          echo "=== Patching linker scripts ==="
+          for f in $(find . -name 'libc.so' -o -name 'libpthread.so' -o -name 'libdl.so' 2>/dev/null); do
+            if [ -f "$f" ] && [ ! -L "$f" ]; then
+              if file "$f" | grep -q "ASCII"; then
+                echo "Patching linker script: $f"
+                cat "$f"
+                sed -i -e 's|/usr/lib64/||g' \
+                       -e 's|/usr/lib/x86_64-linux-gnu/||g' \
+                       -e 's|/usr/lib/||g' \
+                       -e 's|/lib64/||g' \
+                       -e 's|/lib/x86_64-linux-gnu/||g' \
+                       -e 's|/lib/||g' "$f"
+                echo "After:"
+                cat "$f"
+              fi
+            fi
+          done
+
+          echo "=== Verifying fixes ==="
+          ls -la usr/lib/x86_64-linux-gnu/libdl* usr/lib/x86_64-linux-gnu/libpthread* 2>/dev/null || true
+          file usr/lib/x86_64-linux-gnu/libdl.so usr/lib/x86_64-linux-gnu/libpthread.so 2>/dev/null || true
+
       - name: 'Get the BootJDK'
         id: bootjdk
         uses: ./.github/actions/get-bootjdk
