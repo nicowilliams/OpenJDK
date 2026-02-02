@@ -184,12 +184,19 @@ AC_DEFUN_ONCE([LIB_SETUP_MISC_LIBS],
   AC_SUBST(LIBM)
 
   # Setup libdl (for dynamic library loading)
-  save_LIBS="$LIBS"
-  LIBS=""
-  AC_CHECK_LIB(dl, dlopen)
-  LIBDL="$LIBS"
+  # Note: On modern glibc (2.34+), dlopen is in libc, but for cross-compilation
+  # to older systems, we need to explicitly link libdl. Hardcode this for Linux
+  # to avoid host vs target detection issues with AC_CHECK_LIB.
+  if test "x$OPENJDK_TARGET_OS" = xlinux || test "x$OPENJDK_TARGET_OS" = xaix; then
+    LIBDL="-ldl"
+  else
+    save_LIBS="$LIBS"
+    LIBS=""
+    AC_CHECK_LIB(dl, dlopen)
+    LIBDL="$LIBS"
+    LIBS="$save_LIBS"
+  fi
   AC_SUBST(LIBDL)
-  LIBS="$save_LIBS"
 
   # Setup posix pthread support
   if test "x$OPENJDK_TARGET_OS" != "xwindows"; then
