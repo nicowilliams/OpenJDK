@@ -721,13 +721,11 @@ Java_sun_security_jgss_wrapper_GSSLibStub_acquireCred(JNIEnv *env,
     gss_key_value_set_desc credStore = {0, 0};
 
     if (ftab->acquireCredFrom == NULL) {
-      const char *msg = "GSSLibStub_acquireCred from credential store not "
-          "supported by GSS provider";
+      const char *msg = "[GSSLibStub_acquireCred] acquiring from a specific "
+          "credential store not supported by GSS provider";
 
-      TRACE0("[GSSLibStub_acquireCred] acquiring from a specific credential "
-             "store not supported by GSS provider");
-      checkStatus(env, jobj, GSS_S_UNAVAILABLE, minor=0,
-                  "[GSSLibStub_acquireCred]");
+      TRACE0(msg);
+      checkStatus(env, jobj, GSS_S_UNAVAILABLE, minor=0, msg);
       return ptr_to_jlong(NULL);
     }
 
