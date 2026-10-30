@@ -221,12 +221,12 @@ jobs:
           debug-suffix: '${{ matrix.suffix }}'
           draft: false
           prerelease: false
-          tag_name: ts-jgss-jdk21+35-linux-x64
+          tag_name: ts-jgss-jdk21+35-2-linux-x64
           files: |
             releases-bundles.tar
           target_commitish: ts-jgss-jdk21+35
           generate_release_notes: false
-          name: ts-jgss-jdk21+35-linux-x64
+          name: ts-jgss-jdk21+35-2-linux-x64
 
       - name: 'Upload bundles'
         uses: ./.github/actions/upload-bundles
