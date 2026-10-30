@@ -72,6 +72,16 @@ jobs:
     container:
       #image: debian:buster
       image: ubuntu:18.04
+      # GitHub forces JavaScript actions onto Node 24, whose official builds
+      # need glibc >= 2.28, but Ubuntu 18.04 has glibc 2.27.  So we mount
+      # over the runner's Node 24 with an unofficial glibc 2.17 build of
+      # Node 24, which we install in the first step below.
+      volumes:
+        - /node24-glibc217:/node24-glibc217:rw,rshared
+        - /node24-glibc217:/__e/node24:ro,rshared
+    env:
+      NODE24_GLIBC217_VERSION: v24.22.2
+      NODE24_GLIBC217_SHA256: 2644f0845671e149b8b0705a4fdcca2993995348618dc98c681ba0c7cdf604d2
 
     strategy:
       fail-fast: false
@@ -86,13 +96,23 @@ jobs:
       - name: 'Install some dependencies'
         run: |
           apt-get update
-          apt-get install -y build-essential git wget curl sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
+          apt-get install -y build-essential git wget curl xz-utils sudo unzip zip openjdk-11-jdk autoconf libfreetype6-dev libcups2-dev libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-dev libxt-dev libasound2-dev libffi-dev file binutils libfontconfig-dev
           # If we really need gcc-10, we can get it from this PPA:
           apt-get install -y software-properties-common
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+
+      # This must come before any JavaScript actions (see container comment above)
+      - name: 'Install Node 24 built for glibc 2.17'
+        run: |
+          tarball="node-${NODE24_GLIBC217_VERSION}-linux-x64-glibc-217.tar.xz"
+          curl -fsSL -o "/tmp/$tarball" "https://unofficial-builds.nodejs.org/download/release/${NODE24_GLIBC217_VERSION}/$tarball"
+          echo "${NODE24_GLIBC217_SHA256}  /tmp/$tarball" | sha256sum -c -
+          tar -xJf "/tmp/$tarball" --strip-components 1 -C /node24-glibc217
+          rm -f "/tmp/$tarball"
+          /__e/node24/bin/node --version
 
       - name: 'Checkout the JDK source'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: 'Get the BootJDK'
         id: bootjdk
@@ -190,8 +210,11 @@ jobs:
         shell: bash
 
       - name: 'Release'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         id: tsrelease-linux-x64
+        # The docs job also uses this workflow with platform linux-x64; don't
+        # let it clobber the linux-x64 release with an empty tarball.
+        if: steps.bundles.outputs.release-bundles-found == 'true'
         with:
           body: Build of OpenJDK 21+35 with Two Sigma's JGSS enhancements
           platform: ${{ inputs.platform }}
